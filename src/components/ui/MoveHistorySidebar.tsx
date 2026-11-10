@@ -10,6 +10,7 @@ import {
   Award,
   Play,
   Send,
+  Undo2,
 } from 'lucide-react';
 import {
   MoveRecord,
@@ -34,6 +35,7 @@ interface MoveHistorySidebarProps {
   onFocusCell: (row: number, col: number) => void;
   onSendChat: (text: string) => void;
   onSendEmoji: (emoji: string) => void;
+  onUndo?: () => void;
 }
 
 export const MoveHistorySidebar: React.FC<MoveHistorySidebarProps> = ({
@@ -52,6 +54,7 @@ export const MoveHistorySidebar: React.FC<MoveHistorySidebarProps> = ({
   onFocusCell,
   onSendChat,
   onSendEmoji,
+  onUndo,
 }) => {
   const [chatInput, setChatInput] = useState('');
 
@@ -106,15 +109,28 @@ export const MoveHistorySidebar: React.FC<MoveHistorySidebarProps> = ({
         <div className="flex-1 flex flex-col overflow-hidden p-3">
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-xs font-bold text-slate-400">NHẬT KÝ TỌA ĐỘ 30x30</span>
-            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoFocusMove}
-                onChange={(e) => setAutoFocusMove(e.target.checked)}
-                className="rounded accent-cyan-400"
-              />
-              <span>Tự khóa camera</span>
-            </label>
+            <div className="flex items-center gap-2">
+              {onUndo && (
+                <button
+                  onClick={onUndo}
+                  disabled={moves.length === 0}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-35 border border-slate-700 text-[11px] font-bold text-cyan-300 transition"
+                  title="Đi lại nước cờ gần nhất"
+                >
+                  <Undo2 className="w-3 h-3" />
+                  <span>Đi Lại</span>
+                </button>
+              )}
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoFocusMove}
+                  onChange={(e) => setAutoFocusMove(e.target.checked)}
+                  className="rounded accent-cyan-400"
+                />
+                <span>Tự khóa camera</span>
+              </label>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">

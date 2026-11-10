@@ -530,6 +530,7 @@ export default function GamePage() {
                 lanMultiplayer.sendEmoji(emoji, senderLabel);
                 soundEngine.playHover();
               }}
+              onUndo={() => gameEngine.performUndo(false)}
             />
           </div>
         </>

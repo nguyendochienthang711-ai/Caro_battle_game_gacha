@@ -346,10 +346,17 @@ export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroS
 
       syncBoardState: (moveList) => {
         api.clearAllPieces();
-        moveList.forEach((m, idx) => {
-          const isLast = idx === moveList.length - 1;
-          api.spawnPiece3D(m.row, m.col, m.player, isLast);
+        moveList.forEach((m) => {
+          api.spawnPiece3D(m.row, m.col, m.player, false);
         });
+        if (moveList.length > 0) {
+          const last = moveList[moveList.length - 1];
+          const { x, z } = cellToWorld(last.row, last.col);
+          lastMoveBeacon.position.set(x, 0, z);
+          lastMoveBeacon.visible = true;
+        } else {
+          lastMoveBeacon.visible = false;
+        }
       },
 
       showWinEffects: (winningLine, winnerSymbol) => {
@@ -603,9 +610,7 @@ export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroS
   useEffect(() => {
     if (!sceneReady || !sceneApiRef.current) return;
     if (moves.length === 0) {
-      if (piecesCountRef.current > 0) {
-        sceneApiRef.current.clearAllPieces();
-      }
+      sceneApiRef.current.clearAllPieces();
       return;
     }
     if (moves.length < piecesCountRef.current) {

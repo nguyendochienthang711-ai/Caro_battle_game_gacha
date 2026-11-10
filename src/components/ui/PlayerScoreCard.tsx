@@ -313,6 +313,14 @@ export const PlayerScoreCard: React.FC<PlayerScoreCardProps> = ({
                 <span>Chơi Ván Mới</span>
               </button>
 
+              <button
+                onClick={onUndo}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs border border-cyan-400/40 shadow-[0_0_15px_rgba(0,243,255,0.2)] transition"
+              >
+                <Undo2 className="w-4 h-4" />
+                <span>Đi Lại Nước Này</span>
+              </button>
+
               {onBackToDashboard && (
                 <button
                   onClick={onBackToDashboard}
@@ -331,7 +339,7 @@ export const PlayerScoreCard: React.FC<PlayerScoreCardProps> = ({
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-950/85 backdrop-blur-xl border border-slate-700/80 shadow-[0_10px_35px_rgba(0,0,0,0.75)]">
         <button
           onClick={onUndo}
-          disabled={movesCount === 0 || !!winnerInfo}
+          disabled={movesCount === 0}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-700 text-xs font-bold text-cyan-300 transition"
           title="Xin đi lại nước vừa đánh"
         >

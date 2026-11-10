@@ -61,6 +61,7 @@ export function useGameEngine(callbacks: UseGameEngineCallbacks = {}) {
   const [timeLeft, setTimeLeft] = useState<number>(30);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const matchStartTimeRef = useRef<number>(Date.now());
+  const aiTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Replay
   const [replayState, setReplayState] = useState<ReplayState | null>(null);
@@ -253,20 +254,33 @@ export function useGameEngine(callbacks: UseGameEngineCallbacks = {}) {
 
   // AI CyberBot Turn
   useEffect(() => {
+    if (aiTimerRef.current) {
+      clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = null;
+    }
     if (gameMode === 'AI_BOT' && currentPlayer === 'O' && !winnerInfo && !replayState && !isPaused) {
       const timer = setTimeout(() => {
+        aiTimerRef.current = null;
         const aiMove = computeBestMove30x30(board, 'O');
         if (aiMove) {
           executeMoveRef.current(aiMove.row, aiMove.col, 'O', true);
         }
       }, 420);
-      return () => clearTimeout(timer);
+      aiTimerRef.current = timer;
+      return () => {
+        clearTimeout(timer);
+        aiTimerRef.current = null;
+      };
     }
   }, [gameMode, currentPlayer, winnerInfo, replayState, isPaused, board]);
 
   // Reset Board
   const resetBoard = useCallback(
     (isRemote = false) => {
+      if (aiTimerRef.current) {
+        clearTimeout(aiTimerRef.current);
+        aiTimerRef.current = null;
+      }
       setReplayState(null);
       setBoard(createEmptyBoard());
       setMoves([]);
@@ -288,10 +302,35 @@ export function useGameEngine(callbacks: UseGameEngineCallbacks = {}) {
   // Undo Move
   const performUndo = useCallback(
     (isRemote = false) => {
-      if (replayState || winnerInfo || moves.length === 0) return;
+      if (replayState || moves.length === 0) return;
 
-      const stepsToPop = gameMode === 'AI_BOT' && moves.length >= 2 ? 2 : 1;
-      const remainingMoves = moves.slice(0, moves.length - stepsToPop);
+      // Clear pending AI Bot timer if active
+      if (aiTimerRef.current) {
+        clearTimeout(aiTimerRef.current);
+        aiTimerRef.current = null;
+      }
+
+      // If game has ended (someone won or timeout), undo the winning move and resume game!
+      if (winnerInfo) {
+        setWinnerInfo(null);
+      }
+
+      // In AI_BOT mode:
+      // If it's user's turn (X) and moves >= 2: pop 2 moves (Bot's move + User's move).
+      // If it's bot's turn (O) and moves >= 1: pop 1 move (User's move).
+      // In both cases, the turn returns to the User ('X')!
+      let stepsToPop = 1;
+      if (gameMode === 'AI_BOT') {
+        if (currentPlayer === 'X' && moves.length >= 2) {
+          stepsToPop = 2;
+        } else {
+          stepsToPop = 1;
+        }
+      } else {
+        stepsToPop = 1;
+      }
+
+      const remainingMoves = moves.slice(0, Math.max(0, moves.length - stepsToPop));
 
       const rebuiltBoard = createEmptyBoard();
       remainingMoves.forEach((m) => {
@@ -300,15 +339,26 @@ export function useGameEngine(callbacks: UseGameEngineCallbacks = {}) {
 
       setBoard(rebuiltBoard);
       setMoves(remainingMoves);
-      const nextP: PlayerSymbol =
-        remainingMoves.length === 0
-          ? 'X'
-          : remainingMoves[remainingMoves.length - 1].player === 'X'
-          ? 'O'
-          : 'X';
+
+      // Determine next player
+      let nextP: PlayerSymbol = 'X';
+      if (gameMode === 'AI_BOT') {
+        nextP = 'X'; // Always human's turn after undo vs bot
+      } else {
+        if (remainingMoves.length === 0) {
+          nextP = 'X';
+        } else {
+          // The player whose move was undone gets their turn back
+          const lastRemaining = remainingMoves[remainingMoves.length - 1];
+          nextP = lastRemaining.player === 'X' ? 'O' : 'X';
+        }
+      }
+
       setCurrentPlayer(nextP);
       setThreatBanner(null);
       if (turnTimeLimit > 0) setTimeLeft(turnTimeLimit);
+
+      soundEngine.playUndo();
 
       callbacksRef.current.onSyncBoard?.(remainingMoves);
 
@@ -316,7 +366,7 @@ export function useGameEngine(callbacks: UseGameEngineCallbacks = {}) {
         callbacksRef.current.onSendLanPacket?.({ type: 'UNDO' });
       }
     },
-    [replayState, winnerInfo, moves, gameMode, turnTimeLimit]
+    [replayState, winnerInfo, moves, gameMode, turnTimeLimit, currentPlayer]
   );
 
   // Surrender
