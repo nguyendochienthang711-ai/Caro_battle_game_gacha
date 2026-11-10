@@ -439,6 +439,9 @@ export default function GamePage() {
             <div className="relative flex-1 h-full overflow-hidden">
               <CaroScene3D
                 ref={sceneApiRef}
+                sceneRef={sceneApiRef}
+                cameraPreset={cameraPreset}
+                currentPlayer={gameEngine.currentPlayer}
                 moves={gameEngine.moves}
                 onCellClick={handleCellClick}
                 onCellHover={setHoveredCell}

@@ -17,15 +17,20 @@ interface CaroScene3DProps {
   moves: MoveRecord[];
   onCellClick: (row: number, col: number) => void;
   onCellHover?: (cell: CellCoord | null) => void;
+  sceneRef?: React.MutableRefObject<SceneApi | null>;
+  cameraPreset?: CameraPreset;
+  currentPlayer?: PlayerSymbol;
 }
 
 export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroScene3D(
-  { moves, onCellClick, onCellHover },
+  { moves, onCellClick, onCellHover, sceneRef, cameraPreset, currentPlayer = 'X' },
   ref
 ) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [sceneReady, setSceneReady] = useState(false);
   const sceneApiRef = useRef<SceneApi | null>(null);
+  const hoverTileMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  const piecesCountRef = useRef<number>(0);
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -220,6 +225,7 @@ export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroS
       opacity: 0.32,
       side: THREE.DoubleSide,
     });
+    hoverTileMatRef.current = hoverTileMat;
     const hoverTile = new THREE.Mesh(hoverTileGeo, hoverTileMat);
     hoverTile.position.y = 0.03;
     hoverGroup.add(hoverTile);
@@ -297,12 +303,20 @@ export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroS
     });
 
     // Connect Scene API methods
-    sceneApiRef.current = {
+    const api: SceneApi = {
       spawnPiece3D: (row, col, player, animate = true) => {
+        const cellKey = `${row}-${col}`;
+        const alreadyExists = piecesGroup.children.some(
+          (child) => child.userData?.cellKey === cellKey
+        );
+        if (alreadyExists) return;
+
         const { x, z } = cellToWorld(row, col);
         const pieceMesh = createPieceMesh(player);
+        pieceMesh.userData.cellKey = cellKey;
         pieceMesh.position.set(x, animate ? 4.5 : 0, z);
         piecesGroup.add(pieceMesh);
+        piecesCountRef.current = piecesGroup.children.length;
 
         lastMoveBeacon.position.set(x, 0, z);
         lastMoveBeacon.visible = true;
@@ -325,15 +339,16 @@ export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroS
         while (piecesGroup.children.length > 0) {
           piecesGroup.remove(piecesGroup.children[0]);
         }
+        piecesCountRef.current = 0;
         effectsManager.clear();
         lastMoveBeacon.visible = false;
       },
 
       syncBoardState: (moveList) => {
-        sceneApiRef.current?.clearAllPieces();
+        api.clearAllPieces();
         moveList.forEach((m, idx) => {
           const isLast = idx === moveList.length - 1;
-          sceneApiRef.current?.spawnPiece3D(m.row, m.col, m.player, isLast);
+          api.spawnPiece3D(m.row, m.col, m.player, isLast);
         });
       },
 
@@ -373,10 +388,15 @@ export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroS
       },
     };
 
+    sceneApiRef.current = api;
+    if (sceneRef) {
+      sceneRef.current = api;
+    }
+
     // Render initial moves
     if (moves.length > 0) {
       moves.forEach((m) => {
-        sceneApiRef.current?.spawnPiece3D(m.row, m.col, m.player, false);
+        api.spawnPiece3D(m.row, m.col, m.player, false);
       });
     }
 
@@ -559,8 +579,44 @@ export const CaroScene3D = forwardRef<SceneApi, CaroScene3DProps>(function CaroS
       domElem.removeEventListener('wheel', onWheel);
       domElem.removeEventListener('contextmenu', onContextMenu);
       renderer.dispose();
+      sceneApiRef.current = null;
+      if (sceneRef) {
+        sceneRef.current = null;
+      }
     };
   }, []);
+
+  // Reactive sync for Camera Preset buttons (3D Nghiêng / 2D Đỉnh / Xoay 360°)
+  useEffect(() => {
+    if (!sceneReady || !cameraPreset || !sceneApiRef.current) return;
+    sceneApiRef.current.setCameraPresetView(cameraPreset);
+  }, [cameraPreset, sceneReady]);
+
+  // Reactive sync for Hover Tile color based on current player turn (Cyan X / Magenta O)
+  useEffect(() => {
+    if (hoverTileMatRef.current) {
+      hoverTileMatRef.current.color.setHex(currentPlayer === 'O' ? 0xff007f : 0x00f3ff);
+    }
+  }, [currentPlayer, sceneReady]);
+
+  // Reactive sync for 3D Pieces whenever moves array changes
+  useEffect(() => {
+    if (!sceneReady || !sceneApiRef.current) return;
+    if (moves.length === 0) {
+      if (piecesCountRef.current > 0) {
+        sceneApiRef.current.clearAllPieces();
+      }
+      return;
+    }
+    if (moves.length < piecesCountRef.current) {
+      sceneApiRef.current.syncBoardState(moves);
+      return;
+    }
+    moves.forEach((m, idx) => {
+      const isLatest = idx === moves.length - 1;
+      sceneApiRef.current?.spawnPiece3D(m.row, m.col, m.player, isLatest);
+    });
+  }, [moves, sceneReady]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
