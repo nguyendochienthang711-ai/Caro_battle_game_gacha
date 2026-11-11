@@ -45,6 +45,7 @@ Dự án game cờ Caro 3D 30x30 cyberpunk tích hợp hệ thống RPG Meta-Gam
 - **Audio**: Web Audio API Synthesizer (tự tạo âm thanh lập trình không cần file media ngoài)
 - **Multiplayer / Networking**: WebRTC PeerJS, BroadcastChannel, Socket.IO
 - **Icons**: Lucide React
+- **Testing**: Vitest, React Testing Library, jsdom, V8 coverage
 
 ---
 
@@ -62,3 +63,48 @@ npm run dev
 # 3. (Tùy chọn) Chạy Server LAN nội bộ
 npm run server
 ```
+
+---
+
+## 🧪 Kiểm Thử (Testing)
+
+Bộ test dùng **Vitest** + **React Testing Library** chạy trên môi trường **jsdom**.
+
+```bash
+npm test              # Chạy toàn bộ test một lần
+npm run test:watch    # Chế độ watch khi đang phát triển
+npm run test:coverage # Chạy kèm báo cáo coverage (text + html)
+```
+
+Báo cáo coverage HTML được ghi vào `coverage/index.html`.
+
+**Cấu trúc test** (tất cả nằm trong thư mục `test/`):
+
+```
+test/
+├── setup.ts                  # Polyfill localStorage + stub Web Audio API
+├── vitest.d.ts               # Đăng ký jest-dom matchers cho TypeScript
+├── lib/                      # gomokuEngine, rpgEngine, storage, soundEngine
+├── types/                    # game.ts (hằng số, tọa độ)
+├── hooks/                    # useGameEngine (+replay), useLanMultiplayer (+peer)
+└── components/ui/            # Dashboard, Gacha, Battle Arena, Score Card, Sidebar, Navbar, Lobby
+```
+
+| Khu vực | File test | Nội dung |
+|---------|-----------|----------|
+| `test/lib` | `gomokuEngine.test.ts` | Kiểm tra thắng 5 ô theo 4 hướng, cảnh báo 4-3, AI chọn nước |
+| `test/lib` | `rpgEngine.test.ts` | Tỷ lệ rơi đồ, roll gacha, cộng chỉ số 6 ô trang bị |
+| `test/lib` | `storage.test.ts` | Đọc/ghi LocalStorage, dữ liệu hỏng, profile RPG |
+| `test/lib` | `soundEngine.test.ts` | Sound engine không ném lỗi, tôn trọng mute |
+| `test/types` | `game.test.ts` | Hằng số bàn cờ, nhãn cột A..AD, tọa độ |
+| `test/hooks` | `useGameEngine.test.ts` | Đánh cờ, thắng/thua/hòa, undo, đầu hàng, đồng hồ |
+| `test/hooks` | `useGameEngine.replay.test.ts` | Phát lại trận đấu, hòa khi đầy bàn |
+| `test/hooks` | `useLanMultiplayer*.test.ts` | Tạo/vào phòng LAN, chat, emoji, PeerJS & BroadcastChannel |
+| `test/components/ui` | `*.test.tsx` | Dashboard, Gacha, Battle Arena, Score Card, Sidebar, Navbar, Lobby |
+
+Test import source qua alias `@/` (ví dụ `@/lib/gomokuEngine`), nên có thể đặt ở bất kỳ đâu trong `test/`.
+
+**Ghi chú kỹ thuật:**
+- `test/setup.ts` polyfill `localStorage` vì Node 26 có global `localStorage` thử nghiệm đè lên jsdom, và stub Web Audio API để test âm thanh không cần thiết bị thật.
+- `test/vitest.d.ts` đăng ký matcher `jest-dom` cho TypeScript nên `tsc --noEmit` vẫn sạch.
+- Test dùng fake timers cho đồng hồ đếm lượt, animation gacha và vòng lặp chiến đấu.
